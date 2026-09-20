@@ -118,7 +118,7 @@ export default function Hero({ meta, onBegin }: Props) {
   )[0];
 
   return (
-    <header id="top" className="heartglow relative flex min-h-screen flex-col overflow-hidden">
+    <header id="top" className="heartglow relative flex min-h-[100svh] flex-col overflow-hidden">
       <TraceField meta={meta} />
 
       <div className="relative mx-auto flex w-full max-w-6xl flex-1 flex-col justify-center px-5 pt-24 sm:px-8">

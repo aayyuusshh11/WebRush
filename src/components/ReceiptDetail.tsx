@@ -142,7 +142,7 @@ export default function ReceiptDetail({
         animate={{ opacity: 1, y: 0 }}
         exit={{ opacity: 0, y: 40 }}
         transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        className="fixed inset-x-0 bottom-0 z-[71] max-h-[92vh] overflow-y-auto border-t border-accent/40 bg-surface-soft sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[520px] sm:border-l sm:border-t-0"
+        className="fixed inset-x-0 bottom-0 z-[71] max-h-[92dvh] overflow-y-auto border-t border-accent/40 bg-surface-soft sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[520px] sm:border-l sm:border-t-0"
       >
         <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
           <p className="label">{TYPE_NAME[receipt.type]}</p>

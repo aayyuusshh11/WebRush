@@ -114,6 +114,16 @@ data/*.csv ──prepare-data.mjs──▶ public/data/*.json (dictionary-encode
                               React components (UI only)
 ```
 
+Deeper documentation:
+
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — layer rules, module
+  responsibilities, performance decisions
+- [docs/DATA_PIPELINE.md](docs/DATA_PIPELINE.md) — build-time preparation,
+  engine algorithms, evidence gating
+- [docs/SECURITY.md](docs/SECURITY.md) — sanitization guarantees and
+  verification
+- [docs/TESTING.md](docs/TESTING.md) — testing strategy, build & deployment
+
 - **`src/engine/`** — pure functions: normalization, sessions (≤35 min gap),
   strength-graded connections, patterns, discoveries, chapters. No React,
   fully testable.

@@ -4,6 +4,14 @@ import type { Archive } from "../data/dataset";
 import type { LifeReceipt } from "../engine/types";
 import { getThread } from "../engine/connections";
 import { TYPE_COLOR, STRENGTH_CLASS, STRENGTH_LABEL } from "./receiptMeta";
+
+/** Connector dots inherit the strength color so link classes read at a glance. */
+const STRENGTH_DOT: Record<string, string> = {
+  session: "bg-music",
+  temporal: "bg-paper",
+  recurring: "bg-accent",
+  contextual: "bg-mute",
+};
 import { fmtCount, fmtDate, fmtTime } from "../engine/format";
 
 interface Props {
@@ -57,16 +65,19 @@ export default function ThreadExplorer({ archive, receipt, onNavigate }: Props) 
         </p>
       ) : (
         <>
-          {/* the center node */}
-          <div
-            aria-hidden
+          {/* the center node — refocusing slides in the new focus */}
+          <motion.div
+            key={receipt.id}
+            initial={{ opacity: 0, x: 10 }}
+            animate={{ opacity: 1, x: 0 }}
+            transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
             className="mt-4 border border-accent/50 bg-ink/60 p-4"
           >
             <p className={`text-sm ${TYPE_COLOR[receipt.type]}`}>{receipt.title}</p>
             <p className="mt-0.5 text-[11px] uppercase tracking-[0.14em] text-mute">
               {fmtDate(receipt.ts)} · {fmtTime(receipt.ts)}
             </p>
-          </div>
+          </motion.div>
 
           {/* connection nodes, strongest first */}
           <ol className="mt-2" aria-label={`${links.length} connected receipts, ranked by strength`}>
@@ -88,14 +99,17 @@ export default function ThreadExplorer({ archive, receipt, onNavigate }: Props) 
                 >
                   <span
                     aria-hidden
-                    className="absolute left-[5px] top-6 h-2 w-2 rounded-full bg-accent"
+                    className={`absolute left-[5px] top-6 h-2 w-2 rounded-full ${STRENGTH_DOT[link.strength]}`}
                   />
                   <span
                     aria-hidden
                     className="absolute left-[8px] top-0 h-full w-px bg-line"
                   />
                   <div className="flex items-baseline justify-between gap-3">
-                    <span className={`text-sm ${TYPE_COLOR[link.receipt.type]}`}>
+                    <span className="mr-1 shrink-0 font-display text-sm italic text-mute">
+                      {String(i + 1).padStart(2, "0")}
+                    </span>
+                    <span className={`min-w-0 flex-1 truncate text-sm ${TYPE_COLOR[link.receipt.type]}`}>
                       {link.receipt.title}
                     </span>
                     <span className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-mute tabular-nums">

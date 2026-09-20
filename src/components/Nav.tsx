@@ -38,7 +38,7 @@ export default function Nav() {
             <li key={id}>
               <a
                 href={`#${id}`}
-                className="block whitespace-nowrap px-2.5 py-1.5 text-[11px] uppercase tracking-[0.16em] text-faded transition-colors hover:text-accent"
+                className="block whitespace-nowrap px-3 py-2 text-[11px] uppercase tracking-[0.16em] text-faded transition-colors hover:text-accent"
               >
                 {label}
               </a>

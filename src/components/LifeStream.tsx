@@ -120,7 +120,10 @@ export default function LifeStream({ meta }: { meta: ArchiveMeta }) {
         {hover && (
           <div
             className="pointer-events-none absolute top-1 z-10 -translate-x-1/2 whitespace-nowrap border border-line bg-surface px-3 py-2 text-left"
-            style={{ left: `${(hover.x / (wrapRef.current?.clientWidth ?? 1)) * 100}%` }}
+            style={{
+              // Clamp inside the chart so the tooltip never overflows on narrow screens.
+              left: `${Math.min(92, Math.max(8, (hover.x / (wrapRef.current?.clientWidth ?? 1)) * 100))}%`,
+            }}
           >
             <p className="text-[10px] uppercase tracking-[0.18em] text-mute">
               {fmtMonthKey(hover.monthKey)}
