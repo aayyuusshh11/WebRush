@@ -16,28 +16,33 @@ const MAX_ECHO = 2;
 const MAX_TEMPORAL = 4;
 const MAX_RECURRENCE = 3;
 const MAX_LOCATION = 2;
+const MAX_CATEGORY = 2;
 const MAX_THREAD = 9;
 
-/** Binary-search the nearest timestamps around `ts`, excluding ts itself. */
-function nearestTimestamps(sorted: number[], ts: number, n: number): Array<{ ts: number; index: number }> {
-  const out: Array<{ ts: number; index: number }> = [];
+/** Binary-search the nearest receipts by timestamp, excluding `ref` itself. */
+function nearestReceipts(
+  sorted: readonly LifeReceipt[],
+  ref: LifeReceipt,
+  n: number,
+): LifeReceipt[] {
+  const out: LifeReceipt[] = [];
   let lo = 0;
   let hi = sorted.length;
   while (lo < hi) {
     const mid = (lo + hi) >> 1;
-    if (sorted[mid] < ts) lo = mid + 1;
+    if (sorted[mid].ts < ref.ts) lo = mid + 1;
     else hi = mid;
   }
   let a = lo - 1;
   let b = lo;
   while (out.length < n && (a >= 0 || b < sorted.length)) {
-    const da = a >= 0 ? Math.abs(sorted[a] - ts) : Infinity;
-    const db = b < sorted.length ? Math.abs(sorted[b] - ts) : Infinity;
+    const da = a >= 0 ? Math.abs(sorted[a].ts - ref.ts) : Infinity;
+    const db = b < sorted.length ? Math.abs(sorted[b].ts - ref.ts) : Infinity;
     if (db <= da) {
-      if (sorted[b] !== ts) out.push({ ts: sorted[b], index: b });
+      if (sorted[b].id !== ref.id) out.push(sorted[b]);
       b++;
     } else {
-      if (sorted[a] !== ts) out.push({ ts: sorted[a], index: a });
+      if (sorted[a].id !== ref.id) out.push(sorted[a]);
       a--;
     }
   }
@@ -93,12 +98,8 @@ export function getThread(archive: Archive, r: LifeReceipt): ThreadLink[] {
     /* 2 — echoes of the same track */
     const plays = archive.playsByTrack.get(r.title);
     if (plays && plays.length > 1) {
-      for (const { ts, index } of nearestTimestamps(plays, r.ts, MAX_ECHO)) {
-        push(
-          { ...r, id: `m-${index}`, ts },
-          "recurrence",
-          `same track · ${gapLabel(r.ts, ts)}`,
-        );
+      for (const other of nearestReceipts(plays, r, MAX_ECHO)) {
+        push(other, "recurrence", `same track · ${gapLabel(r.ts, other.ts)}`);
       }
     }
 
@@ -123,28 +124,30 @@ export function getThread(archive: Archive, r: LifeReceipt): ThreadLink[] {
     /* 2 — the merchant repeats */
     const visits = archive.purchasesByMerchant.get(r.title);
     if (visits && visits.length > 1 && !r.title.startsWith("Unnamed")) {
-      for (const { ts, index } of nearestTimestamps(visits, r.ts, MAX_RECURRENCE)) {
+      for (const other of nearestReceipts(visits, r, MAX_RECURRENCE)) {
         push(
-          { ...r, id: `c-${index}`, ts },
+          other,
           "recurrence",
-          `same merchant · visit #${index + 1} of ${visits.length}`,
+          `same merchant · visit #${visits.indexOf(other) + 1} of ${visits.length}`,
         );
       }
     }
 
     /* 3 — same city, same month */
-    if (r.city && r.city !== "") {
-      const monthPrefix = r.monthKey;
-      const candidates = archive.receipts.filter(
-        (x) =>
-          x.source === "card" &&
-          x.id !== r.id &&
-          x.city === r.city &&
-          x.monthKey === monthPrefix,
-      );
-      candidates.sort((a, b) => Math.abs(a.ts - r.ts) - Math.abs(b.ts - r.ts));
-      for (const c of candidates.slice(0, MAX_LOCATION)) {
+    if (r.city) {
+      const sameCityMonth = (archive.cardByCityMonth.get(`${r.city}|${r.monthKey}`) ?? [])
+        .filter((x) => x.id !== r.id);
+      for (const c of nearestReceipts(sameCityMonth, r, MAX_LOCATION)) {
         push(c, "location", `same city that month · ${c.title}`);
+      }
+    }
+
+    /* 4 — the same kind of purchase, that month */
+    if (r.category) {
+      const sameKindMonth = (archive.cardByCategoryMonth.get(`${r.category}|${r.monthKey}`) ?? [])
+        .filter((x) => x.id !== r.id && x.title !== r.title);
+      for (const c of nearestReceipts(sameKindMonth, r, MAX_CATEGORY)) {
+        push(c, "category", `same kind of purchase · ${r.category}, that month`);
       }
     }
   }
@@ -153,11 +156,11 @@ export function getThread(archive: Archive, r: LifeReceipt): ThreadLink[] {
     /* 1 — the ritual repeats */
     const occurrences = archive.ledgerBySubcategory.get(r.title);
     if (occurrences && occurrences.length > 1) {
-      for (const { ts, index } of nearestTimestamps(occurrences, r.ts, 2)) {
+      for (const other of nearestReceipts(occurrences, r, 2)) {
         push(
-          { ...r, id: `l-${index}`, ts },
+          other,
           "recurrence",
-          `same item · occurrence #${index + 1} of ${occurrences.length}`,
+          `same item · occurrence #${occurrences.indexOf(other) + 1} of ${occurrences.length}`,
         );
       }
     }

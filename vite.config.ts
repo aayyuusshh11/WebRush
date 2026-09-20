@@ -10,4 +10,8 @@ export default defineConfig({
     target: "es2020",
     chunkSizeWarningLimit: 900,
   },
+  test: {
+    environment: "jsdom",
+    setupFiles: ["./vitest.setup.ts"],
+  },
 });

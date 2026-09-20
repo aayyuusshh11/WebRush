@@ -32,6 +32,20 @@ function TraceField({ meta }: { meta: ArchiveMeta }) {
 
     let raf = 0;
     let running = true;
+    // Only animate while the hero is on screen — saves CPU/battery when the
+    // reader has scrolled into the archive.
+    let inView = true;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        inView = entry.isIntersecting;
+        if (inView && !reduced) {
+          cancelAnimationFrame(raf);
+          raf = requestAnimationFrame(draw);
+        }
+      },
+      { threshold: 0 },
+    );
+    io.observe(canvas);
 
     const draw = (t: number) => {
       const dpr = Math.min(2, window.devicePixelRatio || 1);
@@ -66,7 +80,7 @@ function TraceField({ meta }: { meta: ArchiveMeta }) {
         ctx.fill();
       });
 
-      if (running && !reduced) raf = requestAnimationFrame(draw);
+      if (running && !reduced && inView) raf = requestAnimationFrame(draw);
     };
 
     raf = requestAnimationFrame(draw);
@@ -75,6 +89,7 @@ function TraceField({ meta }: { meta: ArchiveMeta }) {
     return () => {
       running = false;
       cancelAnimationFrame(raf);
+      io.disconnect();
       window.removeEventListener("resize", onResize);
     };
   }, [meta, reduced]);

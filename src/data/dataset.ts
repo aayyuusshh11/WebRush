@@ -43,18 +43,23 @@ export interface Archive {
   byDay: Map<string, LifeReceipt[]>;
   sessions: ListeningSession[];
   sessionById: Map<number, ListeningSession>;
-  /** track name → sorted play timestamps (echo detection). */
-  playsByTrack: Map<string, number[]>;
-  /** merchant → sorted purchase timestamps (recurrence). */
-  purchasesByMerchant: Map<string, number[]>;
-  /** subcategory → sorted ledger timestamps (rituals). */
-  ledgerBySubcategory: Map<string, number[]>;
+  /** track name → plays sorted by time (echo detection). */
+  playsByTrack: Map<string, LifeReceipt[]>;
+  /** merchant → purchases sorted by time (recurrence). */
+  purchasesByMerchant: Map<string, LifeReceipt[]>;
+  /** subcategory → ledger entries sorted by time (rituals). */
+  ledgerBySubcategory: Map<string, LifeReceipt[]>;
+  /** "city|monthKey" → card receipts (same-place connections). */
+  cardByCityMonth: Map<string, LifeReceipt[]>;
+  /** "category|monthKey" → card receipts (same-kind connections). */
+  cardByCategoryMonth: Map<string, LifeReceipt[]>;
   meta: ArchiveMeta;
 }
 
-const pad2 = (n: number) => String(n).padStart(2, "0");
+export const pad2 = (n: number) => String(n).padStart(2, "0");
 
-function keysOf(ts: number) {
+/** Precomputed time keys, derived once per receipt at decode. */
+export function timeKeysOf(ts: number) {
   const d = new Date(ts * 1000);
   return {
     hour: d.getUTCHours(),
@@ -96,7 +101,7 @@ function decodePlays(json: PlaysJson, out: LifeReceipt[]): void {
       skipped: (flags & 1) === 1,
       shuffle: (flags & 2) === 2,
       platform: json.platforms[p],
-      ...keysOf(ts),
+      ...timeKeysOf(ts),
     };
     out.push(receipt);
   }
@@ -117,7 +122,7 @@ function decodeCard(json: CardJson, out: LifeReceipt[]): void {
       state: json.states[state] || undefined,
       amount: amtPaise / 100,
       flagged: flagged === 1,
-      ...keysOf(ts),
+      ...timeKeysOf(ts),
     };
     out.push(receipt);
   }
@@ -140,7 +145,7 @@ function decodeLedger(json: LedgerJson, out: LifeReceipt[]): void {
       subcategory,
       amount: amtPaise / 100,
       platform: json.modes[mode] || undefined,
-      ...keysOf(ts),
+      ...timeKeysOf(ts),
     };
     out.push(receipt);
   }
@@ -188,15 +193,14 @@ export function buildSessions(music: LifeReceipt[]): ListeningSession[] {
   return sessions;
 }
 
-function groupTs<V>(items: V[], keyOf: (v: V) => string, tsOf: (v: V) => number): Map<string, number[]> {
-  const map = new Map<string, number[]>();
-  for (const v of items) {
-    const k = keyOf(v);
+function groupTs(items: LifeReceipt[], keyOf: (r: LifeReceipt) => string): Map<string, LifeReceipt[]> {
+  const map = new Map<string, LifeReceipt[]>();
+  for (const r of items) {
+    const k = keyOf(r);
     const arr = map.get(k);
-    if (arr) arr.push(tsOf(v));
-    else map.set(k, [tsOf(v)]);
+    if (arr) arr.push(r);
+    else map.set(k, [r]);
   }
-  for (const arr of map.values()) arr.sort((a, b) => a - b);
   return map;
 }
 
@@ -216,17 +220,60 @@ function buildMeta(
     if (r.source === "card") m.purchase += 1;
     else if (r.source === "ledger") m.ledger += 1;
   }
-  const tsArr = receipts.map((r) => r.ts);
+  // Loop instead of Math.min(...tsArr) — ~50k spread args can overflow the stack.
+  let firstTs = Number.POSITIVE_INFINITY;
+  let lastTs = Number.NEGATIVE_INFINITY;
+  for (const r of receipts) {
+    if (r.ts < firstTs) firstTs = r.ts;
+    if (r.ts > lastTs) lastTs = r.ts;
+  }
   return {
     monthly,
     musicPlays: Object.values(plays.monthly).reduce((a, b) => a + b, 0),
     purchases: receipts.reduce((a, r) => a + (r.source === "card" ? 1 : 0), 0),
     ledgerEntries: receipts.reduce((a, r) => a + (r.source === "ledger" ? 1 : 0), 0),
-    firstTs: Math.min(...tsArr),
-    lastTs: Math.max(...tsArr),
+    firstTs,
+    lastTs,
     topArtistsAllTime: plays.topArtistsAllTime,
     topArtistsByYear: plays.topArtistsByYear,
     nightShareByYear: plays.nightShareByYear,
+  };
+}
+
+/**
+ * Index a decoded receipt list into the shared Archive: one sort, one pass
+ * over the data for every lookup the app will ever need. Pure — tests build
+ * archives directly through this instead of fetching.
+ */
+export function assembleArchive(receipts: LifeReceipt[], meta: ArchiveMeta): Archive {
+  receipts.sort((a, b) => a.ts - b.ts);
+
+  const byId = new Map(receipts.map((r) => [r.id, r]));
+  const byDay = new Map<string, LifeReceipt[]>();
+  for (const r of receipts) {
+    const arr = byDay.get(r.dayKey);
+    if (arr) arr.push(r);
+    else byDay.set(r.dayKey, [r]);
+  }
+
+  const music = receipts.filter((r) => r.source === "spotify");
+  const purchases = receipts.filter((r) => r.source === "card");
+  const ledgerRows = receipts.filter((r) => r.source === "ledger");
+  const sessions = buildSessions(music);
+  const sessionById = new Map(sessions.map((s) => [s.id, s]));
+
+  return {
+    receipts,
+    byId,
+    byDay,
+    sessions,
+    sessionById,
+    playsByTrack: groupTs(music, (r) => r.title),
+    purchasesByMerchant: groupTs(purchases, (r) => r.title),
+    ledgerBySubcategory: groupTs(ledgerRows, (r) => r.title),
+    cardByCityMonth: groupTs(purchases, (r) => `${r.city ?? ""}|${r.monthKey}`),
+    cardByCategoryMonth: groupTs(purchases, (r) => `${r.category ?? ""}|${r.monthKey}`),
+    meta,
   };
 }
 
@@ -246,36 +293,9 @@ export function loadArchive(): Promise<Archive> {
     decodePlays(plays, receipts);
     decodeCard(card, receipts);
     decodeLedger(ledger, receipts);
-    receipts.sort((a, b) => a.ts - b.ts);
 
-    const byId = new Map(receipts.map((r) => [r.id, r]));
-    const byDay = new Map<string, LifeReceipt[]>();
-    for (const r of receipts) {
-      const arr = byDay.get(r.dayKey);
-      if (arr) arr.push(r);
-      else byDay.set(r.dayKey, [r]);
-    }
-
-    const music = receipts.filter((r) => r.source === "spotify");
-    const purchases = receipts.filter((r) => r.source === "card");
-    const ledgerRows = receipts.filter((r) => r.source === "ledger");
-
-    return {
-      receipts,
-      byId,
-      byDay,
-      sessions: buildSessions(music),
-      sessionById: new Map(),
-      playsByTrack: groupTs(music, (r) => r.title, (r) => r.ts),
-      purchasesByMerchant: groupTs(purchases, (r) => r.title, (r) => r.ts),
-      ledgerBySubcategory: groupTs(ledgerRows, (r) => r.title, (r) => r.ts),
-      meta: buildMeta(plays, receipts),
-    } satisfies Archive;
+    return assembleArchive(receipts, buildMeta(plays, receipts));
   })();
-
-  archivePromise.then((a) => {
-    for (const s of a.sessions) a.sessionById.set(s.id, s);
-  });
 
   return archivePromise;
 }

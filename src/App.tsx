@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadArchive, type Archive } from "./data/dataset";
 import { buildPatterns } from "./engine/patterns";
 import { buildChapters } from "./engine/chapters";
@@ -56,17 +56,25 @@ export default function App() {
     });
   }, []);
 
-  // Scroll-spy: keep the nav's active section marked for screen readers too.
-  const activeRef = useRef<string>("");
+  // Scroll-spy: mark the active section and mirror it onto the nav links via
+  // aria-current so screen-reader users get the same orientation as visual ones.
   useEffect(() => {
     if (!archive) return;
     const ids = ["record", "patterns", "chapters", "archive", "method"];
+    const navLinks = () =>
+      document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Primary"] a[href^="#"]');
+    const setActive = (id: string) => {
+      for (const a of navLinks()) {
+        if (a.getAttribute("href") === `#${id}`) a.setAttribute("aria-current", "true");
+        else a.removeAttribute("aria-current");
+      }
+    };
     const observer = new IntersectionObserver(
       (entries) => {
         for (const entry of entries) {
           if (entry.isIntersecting) {
-            activeRef.current = entry.target.id;
             entry.target.setAttribute("data-active-section", "true");
+            setActive(entry.target.id);
           } else {
             entry.target.removeAttribute("data-active-section");
           }
@@ -78,7 +86,10 @@ export default function App() {
       const el = document.getElementById(id);
       if (el) observer.observe(el);
     }
-    return () => observer.disconnect();
+    return () => {
+      observer.disconnect();
+      for (const a of navLinks()) a.removeAttribute("aria-current");
+    };
   }, [archive]);
 
   if (error) return <LoadError message={error} />;
@@ -90,6 +101,12 @@ export default function App() {
 
   return (
     <div className="grain min-h-screen bg-ink text-paper">
+      <a
+        href="#record"
+        className="sr-only focus:not-sr-only focus:fixed focus:left-4 focus:top-4 focus:z-[100] focus:border focus:border-accent focus:bg-ink focus:px-4 focus:py-2.5 focus:text-[11px] focus:uppercase focus:tracking-[0.18em] focus:text-accent"
+      >
+        Skip to the record
+      </a>
       <Nav />
       <main>
         <Hero meta={archive.meta} onBegin={beginTrace} />

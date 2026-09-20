@@ -18,6 +18,7 @@ npm run prepare:data # parse + sanitize the source CSVs → public/data/*.json
 npm run dev          # local development
 npm run build        # typecheck + production build → dist/
 npm run preview      # serve the production build locally
+npm run test         # 39 engine, component and security tests (vitest)
 ```
 
 The `data/` folder ships with the project; `public/data/` is regenerated from
@@ -105,6 +106,24 @@ data/*.csv ──prepare-data.mjs──▶ public/data/*.json (dictionary-encode
 - **`src/components/`** — presentation only; all analysis happens in the engine.
 - **Performance** — ~49k receipts decode in one pass; the archive list renders
   60 rows per page; dense visuals are canvas; everything else is memoized.
+  The hero animation pauses when scrolled offscreen; the thread engine reads
+  precomputed indexes instead of scanning the archive.
+
+## Verification
+
+The project ships with a test suite (`npm run test`, vitest + Testing
+Library):
+
+- **Engine tests** — session grouping (35-minute rule), thread links
+  (determinism, self-link ban, 9-link cap, human reasons), pattern math
+  (streaks, rituals, spending), and chapter evidence gating: *no evidence, no
+  chapter* is enforced by tests, not just prose.
+- **Component tests** — chapter accordion ARIA state (`aria-expanded`,
+  `aria-controls`, labelled regions) and the loading/error screens.
+- **Security tests** — a hard gate over `public/data/*.json`: no PII keys
+  (`cc_num`, names, addresses, dob, coordinates…), no card-number-length digit
+  runs, and no unexpected fields in the shipped archives. If sanitization ever
+  regresses, the suite fails before anything ships.
 
 ## Stack
 
@@ -113,8 +132,11 @@ Lucide · Instrument Serif + Inter. No backend, no database, no analytics.
 
 ## Accessibility
 
-Semantic landmarks and headings · visible focus rings · `aria-pressed` filter
-state · `prefers-reduced-motion` honored (canvas drift and reveals stop) ·
+Semantic landmarks and headings · skip link to the main content · visible focus
+rings · `aria-pressed` filter state · `aria-current` scroll-spy on the nav ·
+`aria-expanded`/`aria-controls` accordions · modal drawer traps focus, labels
+itself with `role="dialog" aria-modal`, and returns focus on close ·
+`prefers-reduced-motion` honored (canvas drift and reveals stop) ·
 screen-reader equivalents for every canvas · Escape closes the drawer ·
 keyboard-operable throughout.
 

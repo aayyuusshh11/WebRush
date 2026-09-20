@@ -27,6 +27,7 @@ function ChapterCard({
       <button
         onClick={onToggle}
         aria-expanded={open}
+        aria-controls={`chapter-body-${chapter.id}`}
         className="group grid w-full grid-cols-[auto_1fr_auto] items-baseline gap-4 py-8 text-left sm:gap-8 sm:py-10"
       >
         <span className="font-display text-3xl italic text-mute transition-colors group-hover:text-accent sm:text-4xl">
@@ -52,6 +53,9 @@ function ChapterCard({
         {open && (
           <motion.div
             key="body"
+            id={`chapter-body-${chapter.id}`}
+            role="region"
+            aria-label={`${chapter.title} — evidence and connections`}
             initial={{ height: 0, opacity: 0 }}
             animate={{ height: "auto", opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
