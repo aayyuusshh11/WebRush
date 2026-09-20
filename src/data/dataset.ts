@@ -3,11 +3,11 @@
  * Everything is decoded, sorted and indexed exactly once, then shared.
  */
 
-import type { ArchiveMeta, LifeReceipt, ListeningSession, SourceId } from "../engine/types";
+import type { ArchiveMeta, LifeReceipt, ListeningSession } from "../engine/types";
 
 /* ---------- raw shapes (see scripts/prepare-data.mjs for schemas) ---------- */
 
-interface PlaysJson {
+export interface PlaysJson {
   artists: string[];
   tracks: string[];
   albums: string[];
@@ -19,7 +19,7 @@ interface PlaysJson {
   rows: Array<[number, number, number, number, number, number, number]>;
 }
 
-interface CardJson {
+export interface CardJson {
   merchants: string[];
   categories: string[];
   cities: string[];
@@ -27,7 +27,7 @@ interface CardJson {
   rows: Array<[number, number, number, number, number, number, number]>;
 }
 
-interface LedgerJson {
+export interface LedgerJson {
   modes: string[];
   categories: string[];
   subcategories: string[];
@@ -58,6 +58,23 @@ export interface Archive {
 
 export const pad2 = (n: number) => String(n).padStart(2, "0");
 
+/* -------------------------------------------------------------------------- */
+/* Defensive parsing helpers — malformed prepared data must degrade to fewer  */
+/* receipts, never crash the app. Valid data is unaffected.                    */
+/* -------------------------------------------------------------------------- */
+
+/** Dictionary lookup that cannot throw when a dictionary is missing. */
+function dict(list: string[] | undefined, i: number): string {
+  return Array.isArray(list) ? (list[i] ?? "") : "";
+}
+
+/** Accept only rows of the expected shape with a finite leading timestamp. */
+function numericRow(row: unknown, width: number): number[] | null {
+  return Array.isArray(row) && row.length >= width && Number.isFinite(row[0])
+    ? (row as number[])
+    : null;
+}
+
 /** Precomputed time keys, derived once per receipt at decode. */
 export function timeKeysOf(ts: number) {
   const d = new Date(ts * 1000);
@@ -82,25 +99,33 @@ function displayCategory(raw: string): string {
 async function fetchJson<T>(name: string): Promise<T> {
   const res = await fetch(`data/${name}`);
   if (!res.ok) throw new Error(`Could not open ${name} (${res.status})`);
-  return (await res.json()) as T;
+  const data: unknown = await res.json();
+  if (data === null || typeof data !== "object") {
+    throw new Error(`${name} is not a valid archive`);
+  }
+  return data as T;
 }
 
 function decodePlays(json: PlaysJson, out: LifeReceipt[]): void {
-  for (let i = 0; i < json.rows.length; i++) {
-    const [ts, a, t, al, ms6, flags, p] = json.rows[i];
-    const track = json.tracks[t];
+  const rows = Array.isArray(json.rows) ? json.rows : [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = numericRow(rows[i], 7);
+    if (!row) continue;
+    const [ts, a, t, al, ms6, flags, p] = row;
+    const track = dict(json.tracks, t);
+    if (!track) continue; // dictionary miss — skip rather than render a blank receipt
     const receipt: LifeReceipt = {
       id: `m-${i}`,
       type: "music",
       source: "spotify",
       ts,
       title: track,
-      subtitle: json.artists[a],
-      album: json.albums[al] || undefined,
-      msPlayed: ms6 << 6,
-      skipped: (flags & 1) === 1,
-      shuffle: (flags & 2) === 2,
-      platform: json.platforms[p],
+      subtitle: dict(json.artists, a) || undefined,
+      album: dict(json.albums, al) || undefined,
+      msPlayed: (Number(ms6) || 0) << 6,
+      skipped: (Number(flags) & 1) === 1,
+      shuffle: (Number(flags) & 2) === 2,
+      platform: dict(json.platforms, p) || undefined,
       ...timeKeysOf(ts),
     };
     out.push(receipt);
@@ -108,19 +133,22 @@ function decodePlays(json: PlaysJson, out: LifeReceipt[]): void {
 }
 
 function decodeCard(json: CardJson, out: LifeReceipt[]): void {
-  for (let i = 0; i < json.rows.length; i++) {
-    const [ts, m, c, amtPaise, city, state, flagged] = json.rows[i];
+  const rows = Array.isArray(json.rows) ? json.rows : [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = numericRow(rows[i], 7);
+    if (!row) continue;
+    const [ts, m, c, amtPaise, city, state, flagged] = row;
     const receipt: LifeReceipt = {
       id: `c-${i}`,
       type: "purchase",
       source: "card",
       ts,
-      title: displayMerchant(json.merchants[m]),
-      subtitle: [json.cities[city], json.states[state]].filter(Boolean).join(", ") || undefined,
-      category: displayCategory(json.categories[c]),
-      city: json.cities[city] || undefined,
-      state: json.states[state] || undefined,
-      amount: amtPaise / 100,
+      title: displayMerchant(dict(json.merchants, m)),
+      subtitle: [dict(json.cities, city), dict(json.states, state)].filter(Boolean).join(", ") || undefined,
+      category: displayCategory(dict(json.categories, c)),
+      city: dict(json.cities, city) || undefined,
+      state: dict(json.states, state) || undefined,
+      amount: (Number(amtPaise) || 0) / 100,
       flagged: flagged === 1,
       ...timeKeysOf(ts),
     };
@@ -129,22 +157,25 @@ function decodeCard(json: CardJson, out: LifeReceipt[]): void {
 }
 
 function decodeLedger(json: LedgerJson, out: LifeReceipt[]): void {
-  for (let i = 0; i < json.rows.length; i++) {
-    const [ts, mode, cat, sub, note, amtPaise, kind] = json.rows[i];
-    const kindRaw = json.kinds[kind] ?? "expense";
+  const rows = Array.isArray(json.rows) ? json.rows : [];
+  for (let i = 0; i < rows.length; i++) {
+    const row = rows[i];
+    if (!Array.isArray(row) || row.length < 7 || !Number.isFinite(row[0])) continue;
+    const [ts, mode, cat, sub, note, amtPaise, kind] = row as [number, number, number, number, string, number, number];
+    const kindRaw = dict(json.kinds, kind) || "expense";
     const type = kindRaw.startsWith("income") ? "income" : kindRaw.startsWith("transfer") ? "transfer" : "expense";
-    const subcategory = json.subcategories[sub] || undefined;
+    const subcategory = dict(json.subcategories, sub) || undefined;
     const receipt: LifeReceipt = {
       id: `l-${i}`,
       type,
       source: "ledger",
       ts,
-      title: subcategory ?? displayCategory(json.categories[cat]),
-      subtitle: note || undefined,
-      category: displayCategory(json.categories[cat]),
+      title: subcategory ?? displayCategory(dict(json.categories, cat)),
+      subtitle: typeof note === "string" && note ? note : undefined,
+      category: displayCategory(dict(json.categories, cat)),
       subcategory,
-      amount: amtPaise / 100,
-      platform: json.modes[mode] || undefined,
+      amount: (Number(amtPaise) || 0) / 100,
+      platform: dict(json.modes, mode) || undefined,
       ...timeKeysOf(ts),
     };
     out.push(receipt);
@@ -214,7 +245,7 @@ function buildMeta(
     if (!m) { m = { music: 0, purchase: 0, ledger: 0 }; monthly.set(k, m); }
     return m;
   };
-  for (const [k, n] of Object.entries(plays.monthly)) touch(k).music += n;
+  for (const [k, n] of Object.entries(plays.monthly ?? {})) touch(k).music += n;
   for (const r of receipts) {
     const m = touch(r.monthKey);
     if (r.source === "card") m.purchase += 1;
@@ -300,8 +331,4 @@ export function loadArchive(): Promise<Archive> {
   return archivePromise;
 }
 
-export const SOURCE_LABEL: Record<SourceId, string> = {
-  spotify: "Streaming archive",
-  card: "Card statement",
-  ledger: "Household ledger",
-};
+

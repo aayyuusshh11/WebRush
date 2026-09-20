@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from "react";
+import { useCallback, useMemo, useRef, useState } from "react";
 import SectionHeader from "./SectionHeader";
 import ReceiptRow from "./ReceiptRow";
 import ThreadPanel from "./ThreadPanel";
@@ -75,6 +75,15 @@ export default function ArchiveView({ archive, focus, onOpenReceipt }: Props) {
   }, [archive, era, type, query, dayKey, searchIndex]);
 
   const visible = filtered.slice(0, limit);
+
+  // Stable callback so memoized rows do not re-render on unrelated renders.
+  const handleOpen = useCallback(
+    (rcpt: LifeReceipt) => {
+      setSelected(rcpt);
+      onOpenReceipt(rcpt.id);
+    },
+    [onOpenReceipt],
+  );
 
   const pickDay = (key: string | null) => {
     setDayKey(key);
@@ -226,7 +235,7 @@ export default function ArchiveView({ archive, focus, onOpenReceipt }: Props) {
                     key={r.id}
                     r={r}
                     selected={selected?.id === r.id}
-                    onOpen={(rcpt) => { setSelected(rcpt); onOpenReceipt(rcpt.id); }}
+                    onOpen={handleOpen}
                   />
                 ))}
               </ul>

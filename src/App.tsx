@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { MotionConfig } from "framer-motion";
 import { loadArchive, type Archive } from "./data/dataset";
 import { buildPatterns } from "./engine/patterns";
 import { buildChapters } from "./engine/chapters";
@@ -105,7 +106,10 @@ export default function App() {
     document.getElementById("record")?.scrollIntoView({ behavior: "smooth" });
   };
 
+  // reducedMotion="user" makes every Framer transform/opacity animation honor
+  // the OS reduced-motion setting — the CSS media rule alone cannot reach them.
   return (
+    <MotionConfig reducedMotion="user">
     <div className="grain min-h-screen bg-ink text-paper">
       <a
         href="#record"
@@ -149,5 +153,6 @@ export default function App() {
         />
       )}
     </div>
+    </MotionConfig>
   );
 }

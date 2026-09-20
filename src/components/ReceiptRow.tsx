@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { LifeReceipt } from "../engine/types";
 import { TYPE_COLOR } from "./receiptMeta";
 import { fmtAmount, fmtDuration, fmtTime } from "../engine/format";
@@ -9,7 +10,7 @@ interface Props {
 }
 
 /** One archive row: time, artifact, and the number it carries. */
-export default function ReceiptRow({ r, onOpen, selected }: Props) {
+function ReceiptRow({ r, onOpen, selected }: Props) {
   const secondary =
     r.source === "spotify"
       ? r.subtitle
@@ -53,3 +54,7 @@ export default function ReceiptRow({ r, onOpen, selected }: Props) {
     </li>
   );
 }
+
+/* Rows are pure presentations of immutable receipts — memo keeps the 60-row
+   page from re-rendering on every search keystroke in the parent. */
+export default memo(ReceiptRow);
