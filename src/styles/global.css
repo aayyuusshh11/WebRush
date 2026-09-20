@@ -1,0 +1,98 @@
+@import "tailwindcss";
+
+/*
+ * TRACE design language — dark, editorial, quiet.
+ * Palette and principles follow the design spec: restrained, archival, cinematic.
+ */
+@theme {
+  --color-ink: #0d0d0f;
+  --color-surface: #151518;
+  --color-surface-soft: #1c1c20;
+  --color-line: #26262b;
+  --color-paper: #f2efe8;
+  --color-faded: #a09d96;
+  --color-mute: #65636a;
+  --color-accent: #d7a765;
+
+  /* receipt types — muted category hues, never rainbow */
+  --color-music: #d7a765;
+  --color-purchase: #7c9885;
+  --color-expense: #a97678;
+  --color-income: #7a93a8;
+  --color-transfer: #8a8794;
+
+  --font-display: "Instrument Serif", Georgia, "Times New Roman", serif;
+  --font-ui: "Inter", system-ui, -apple-system, sans-serif;
+}
+
+html {
+  scroll-behavior: smooth;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
+body {
+  background-color: var(--color-ink);
+  color: var(--color-paper);
+  font-family: var(--font-ui);
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+::selection {
+  background: rgba(215, 167, 101, 0.28);
+  color: #f2efe8;
+}
+
+/* One consistent, visible focus ring everywhere. */
+:focus-visible {
+  outline: 1px solid var(--color-accent);
+  outline-offset: 3px;
+  border-radius: 1px;
+}
+
+/* Fine film-grain atmosphere — kept extremely subtle. */
+.grain::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 60;
+  opacity: 0.05;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='140' height='140'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2'/%3E%3C/filter%3E%3Crect width='140' height='140' filter='url(%23n)' opacity='0.6'/%3E%3C/svg%3E");
+}
+
+/* Soft radial light behind the hero, drawn once, cheap. */
+.heartglow {
+  background:
+    radial-gradient(ellipse 70% 45% at 50% 30%, rgba(215, 167, 101, 0.07), transparent 70%),
+    radial-gradient(ellipse 50% 40% at 80% 80%, rgba(122, 147, 168, 0.045), transparent 70%);
+}
+
+/* Hairline rule used across editorial sections. */
+.rule {
+  border-top: 1px solid var(--color-line);
+}
+
+/* Small-caps archival label style. */
+.label {
+  font-family: var(--font-ui);
+  font-size: 0.6875rem;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--color-mute);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
