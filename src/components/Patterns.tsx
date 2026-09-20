@@ -10,11 +10,13 @@ function HourCanvas({
   bins,
   peak,
   color,
+  unit,
   ariaLabel,
 }: {
   bins: number[];
   peak: number;
   color: string;
+  unit: string;
   ariaLabel: string;
 }) {
   const ref = useRef<HTMLCanvasElement>(null);
@@ -59,7 +61,19 @@ function HourCanvas({
     return () => ro.disconnect();
   }, [bins, peak, max, color]);
 
-  return <canvas ref={ref} className="h-28 w-full" role="img" aria-label={ariaLabel} />;
+  return (
+    <div>
+      <canvas ref={ref} className="h-28 w-full" role="img" aria-label={ariaLabel} />
+      {/* The canvas is decorative; this list is the data. */}
+      <ul className="sr-only" aria-label={`${ariaLabel}, hour by hour`}>
+        {bins.map((n, hr) => (
+          <li key={hr}>
+            {String(hr).padStart(2, "0")}:00 — {n} {unit}
+          </li>
+        ))}
+      </ul>
+    </div>
+  );
 }
 
 /* ---------- typographic bar list ---------- */
@@ -111,6 +125,8 @@ interface Props {
 export default function Patterns({ patterns: p, meta }: Props) {
   const nightYears = Object.entries(meta.nightShareByYear).sort(([a], [b]) => a.localeCompare(b));
   const maxNight = Math.max(0.01, ...nightYears.map(([, v]) => v));
+  const musicPeak = p.peakHour;
+  const purchasePeak = p.purchaseHours.indexOf(Math.max(...p.purchaseHours));
 
   return (
     <section id="patterns" aria-labelledby="patterns-title" className="scroll-mt-16 border-t border-line bg-surface/40 py-24 sm:py-32">
@@ -129,29 +145,37 @@ export default function Patterns({ patterns: p, meta }: Props) {
               <p className="text-sm text-paper">
                 Plays cluster after midnight —{" "}
                 <span className="text-accent">
-                  {String(p.peakHour).padStart(2, "0")}:00
+                  {String(musicPeak).padStart(2, "0")}:00
                 </span>{" "}
                 is the busiest hour.
               </p>
               <div className="mt-4">
                 <HourCanvas
                   bins={p.musicHours}
-                  peak={p.peakHour}
+                  peak={musicPeak}
                   color="215, 167, 101"
-                  ariaLabel={`Plays by hour of day, peak at hour ${p.peakHour}`}
+                  unit="plays"
+                  ariaLabel={`Plays by hour of day, peak at hour ${musicPeak}`}
                 />
               </div>
             </div>
             <div>
               <p className="text-sm text-paper">
-                Payments keep office hours — the card wakes up later than the music.
+                Card payments peak at{" "}
+                <span className="text-accent">
+                  {String(purchasePeak).padStart(2, "0")}:00
+                </span>
+                {purchasePeak > musicPeak
+                  ? ` — later in the day than music's ${String(musicPeak).padStart(2, "0")}:00.`
+                  : "."}
               </p>
               <div className="mt-4">
                 <HourCanvas
                   bins={p.purchaseHours}
-                  peak={p.purchaseHours.indexOf(Math.max(...p.purchaseHours))}
+                  peak={purchasePeak}
                   color="124, 152, 133"
-                  ariaLabel="Card payments by hour of day"
+                  unit="card payments"
+                  ariaLabel={`Card payments by hour of day, peak at hour ${purchasePeak}`}
                 />
               </div>
             </div>
@@ -212,8 +236,8 @@ export default function Patterns({ patterns: p, meta }: Props) {
         <div>
           <h3 className="label">Changes</h3>
           <p className="mt-6 text-sm leading-relaxed text-faded">
-            Share of all plays that happened between midnight and 6 AM, by year.
-            The night never quite lets go.
+            Share of all plays that happened between midnight and 6 AM, measured
+            for every year on record.
           </p>
           <ul className="mt-6 space-y-2.5" aria-label="Late-night listening share by year">
             {nightYears.map(([year, share]) => (

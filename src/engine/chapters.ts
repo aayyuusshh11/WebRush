@@ -70,8 +70,8 @@ export function buildChapters(archive: Archive, p: Patterns): Chapter[] {
       numeral: nextNumeral(),
       title: "THE NIGHT SHIFT",
       observation: [
-        `A large share of this life happens after midnight. ${Math.round(nightShare * 100)}% of all plays in the detail era occurred between 00:00 and 06:00.`,
-        `The single longest listening session ran ${fmtCount(Math.round((ls.end - ls.start) / 60))} minutes and ${ls.tracks} tracks deep${ls.artist ? `, circling ${ls.artist}` : ""}.`,
+        `A large share of listening happens after midnight. ${Math.round(nightShare * 100)}% of all plays in the detail era (2022–2024) occurred between 00:00 and 06:00.`,
+        `The single longest listening session ran ${fmtCount(Math.round((ls.end - ls.start) / 60))} minutes and ${ls.tracks} tracks deep${ls.artist ? `, with ${ls.artist} the most-played artist in it` : ""}.`,
       ],
       evidence: [
         { label: "Plays after midnight", value: `${fmtCount(nightPlays)} of ${fmtCount(totalDetailPlays)}` },
@@ -90,6 +90,7 @@ export function buildChapters(archive: Archive, p: Patterns): Chapter[] {
   const topArtist = p.topArtists[0];
   if (topArtist && topArtist[1] >= 300) {
     const allTime = archive.meta.topArtistsAllTime[0];
+    const nextThree = p.topArtists.slice(1, 4).reduce((a, [, n]) => a + n, 0);
     const firstPlay = archive.receipts.find(
       (r) => r.source === "spotify" && r.subtitle === topArtist[0],
     );
@@ -98,9 +99,9 @@ export function buildChapters(archive: Archive, p: Patterns): Chapter[] {
       numeral: nextNumeral(),
       title: "THE REPEAT",
       observation: [
-        `One artist returns again and again. ${topArtist[0]} appears ${fmtCount(topArtist[1])} times in the detail era — more than the next three combined in some months.`,
+        `One artist returns again and again. ${topArtist[0]} appears ${fmtCount(topArtist[1])} times in the detail era${topArtist[1] > nextThree ? ` — more than the next three artists combined (${fmtCount(nextThree)} plays)` : ""}.`,
         allTime && allTime[0] === topArtist[0]
-          ? `Across the full archive, ${allTime[0]} was played ${fmtCount(allTime[1])} times since 2013. A constant, not a phase.`
+          ? `Across the full archive, ${allTime[0]} was played ${fmtCount(allTime[1])} times since 2013 — the most of any artist on record.`
           : `Across the full archive since 2013, ${allTime ? `${allTime[0]} leads with ${fmtCount(allTime[1])} plays.` : "the pattern holds."}`,
       ],
       evidence: [
@@ -132,7 +133,7 @@ export function buildChapters(archive: Archive, p: Patterns): Chapter[] {
       title: "THE CONVERGENCE",
       observation: [
         `From 2022, two archives run at once. Songs and card payments share the same days — ${fmtCount(p.daysWithBoth)} days carried both.`,
-        `The densest of them held ${strongest.music} plays and ${strongest.purchases} purchases. What looked like separate receipts was often one evening.`,
+        `The densest of them held ${strongest.music} plays and ${strongest.purchases} purchases on the same date.`,
       ],
       evidence: [
         { label: "Days with music + money", value: fmtCount(p.daysWithBoth) },
@@ -162,7 +163,7 @@ export function buildChapters(archive: Archive, p: Patterns): Chapter[] {
       title: "THE RITUALS",
       observation: [
         `Some receipts barely change. ${first.label} appears ${first.count} times${first.medianAmount !== undefined ? `, usually ${fmtAmount(first.medianAmount)}` : ""}. ${second ? `${second.label} appears ${second.count} times.` : ""}`,
-        `Individually they are noise. Together they are a rhythm — the small, repeated costs a life runs on.`,
+        `Each item below appears at least 20 times in the ledger period — the most frequently repeated small costs on record.`,
       ],
       evidence: p.rituals.slice(0, 4).map((r) => ({
         label: r.label,
@@ -187,7 +188,7 @@ export function buildChapters(archive: Archive, p: Patterns): Chapter[] {
       numeral: nextNumeral(),
       title: "WHERE THE MONEY WENT",
       observation: [
-        `${fmtCount(archive.meta.purchases)} card transactions. Median size ${fmtAmount(p.medianPurchase)} — this is a life of small, frequent payments, not large ones.`,
+        `${fmtCount(archive.meta.purchases)} card transactions. Median size ${fmtAmount(p.medianPurchase)} — half of all purchases sit at or below it.`,
         `${top.category.replace("_", " ")} takes the largest share at ${fmtAmount(top.total)} (${Math.round(share * 100)}%).`,
       ],
       evidence: p.spendByCategory.slice(0, 4).map((c) => ({

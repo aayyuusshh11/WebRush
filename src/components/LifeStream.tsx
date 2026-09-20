@@ -167,12 +167,33 @@ export default function LifeStream({ meta }: { meta: ArchiveMeta }) {
         ))}
       </div>
 
-      {/* readable equivalent for screen readers */}
-      <p className="sr-only">
-        Life stream, month by month from 2013 to 2024. Music listening runs
-        throughout. The household ledger covers 2015 to 2018. Card payments begin
-        in 2022 and continue to the end of 2024.
-      </p>
+      {/* Semantic equivalent for screen readers — the actual data, not a
+          description of a chart. Months without detail rows are aggregates. */}
+      <table className="sr-only">
+        <caption>
+          Life stream, month by month from 2013 to 2024: music plays, card
+          payments and household ledger entries. Music before 2022 is a monthly
+          aggregate; 2022–2024 and all card and ledger rows are detailed.
+        </caption>
+        <thead>
+          <tr>
+            <th scope="col">Month</th>
+            <th scope="col">Music</th>
+            <th scope="col">Purchases</th>
+            <th scope="col">Ledger</th>
+          </tr>
+        </thead>
+        <tbody>
+          {months.map(([key, c]) => (
+            <tr key={key}>
+              <th scope="row">{fmtMonthKey(key)}</th>
+              <td>{c.music}</td>
+              <td>{c.purchase}</td>
+              <td>{c.ledger}</td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
     </div>
   );
 }

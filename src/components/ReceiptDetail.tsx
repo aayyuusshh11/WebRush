@@ -1,80 +1,23 @@
-import { useEffect, useMemo, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import type { Archive } from "../data/dataset";
-import type { LifeReceipt, ThreadLink } from "../engine/types";
 import { getThread } from "../engine/connections";
 import {
   fmtAmount,
-  fmtCount,
   fmtDate,
   fmtDayLong,
   fmtDuration,
   fmtGap,
   fmtTime,
 } from "../engine/format";
-
-const TYPE_COLOR: Record<LifeReceipt["type"], string> = {
-  music: "text-music",
-  purchase: "text-purchase",
-  expense: "text-expense",
-  income: "text-income",
-  transfer: "text-transfer",
-};
-
-const TYPE_NAME: Record<LifeReceipt["type"], string> = {
-  music: "A song",
-  purchase: "A purchase",
-  expense: "An expense",
-  income: "Income",
-  transfer: "A transfer",
-};
-
-function ThreadNode({
-  link,
-  onOpen,
-}: {
-  link: ThreadLink;
-  onOpen: (id: string) => void;
-}) {
-  return (
-    <motion.li
-      initial={{ opacity: 0, y: 14 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-    >
-      <button
-        onClick={() => onOpen(link.receipt.id)}
-        className="group relative block w-full py-4 pl-8 text-left transition-colors hover:bg-surface/60"
-      >
-        <span
-          aria-hidden
-          className="absolute left-[5px] top-6 h-2 w-2 rounded-full bg-accent"
-        />
-        <span
-          aria-hidden
-          className="absolute left-[8px] top-0 h-full w-px bg-line"
-        />
-        <div className="flex items-baseline justify-between gap-3">
-          <span className={`text-sm ${TYPE_COLOR[link.receipt.type]}`}>
-            {link.receipt.title}
-          </span>
-          <span className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-mute tabular-nums">
-            {fmtTime(link.receipt.ts)}
-          </span>
-        </div>
-        <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-mute">
-          {link.reason}
-        </p>
-      </button>
-    </motion.li>
-  );
-}
+import { TYPE_NAME } from "./receiptMeta";
+import ThreadExplorer from "./ThreadExplorer";
 
 interface Props {
   archive: Archive;
+  /** Entry receipt for this drawer session (from App state). */
   receiptId: string;
   onClose: () => void;
-  onOpenReceipt: (id: string) => void;
   onOpenDay: (dayKey: string) => void;
 }
 
@@ -82,10 +25,25 @@ export default function ReceiptDetail({
   archive,
   receiptId,
   onClose,
-  onOpenReceipt,
   onOpenDay,
 }: Props) {
-  const receipt = archive.byId.get(receiptId);
+  /* Thread exploration context: the back stack holds the full path of
+     receipts visited in this drawer session, so a reader can follow a
+     thread across years and still find the way home. External navigation
+     (chapters, archive rows) changes receiptId and resets the path. */
+  const [stack, setStack] = useState<Array<string>>([receiptId]);
+  useEffect(() => {
+    setStack([receiptId]);
+  }, [receiptId]);
+
+  const focusId = stack[stack.length - 1];
+  const receipt = archive.byId.get(focusId);
+  const previousTitle =
+    stack.length > 1 ? archive.byId.get(stack[stack.length - 2])?.title : undefined;
+
+  const navigate = (id: string) => setStack((s) => [...s, id]);
+  const back = () => setStack((s) => (s.length > 1 ? s.slice(0, -1) : s));
+
   const panelRef = useRef<HTMLDivElement>(null);
   const restoreFocusRef = useRef<HTMLElement | null>(null);
 
@@ -132,7 +90,7 @@ export default function ReceiptDetail({
     };
   }, [onClose]);
 
-  const links = useMemo(
+  const threadLinks = useMemo(
     () => (receipt ? getThread(archive, receipt) : []),
     [archive, receipt],
   );
@@ -186,21 +144,31 @@ export default function ReceiptDetail({
         transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
         className="fixed inset-x-0 bottom-0 z-[71] max-h-[92vh] overflow-y-auto border-t border-accent/40 bg-surface-soft sm:inset-y-0 sm:left-auto sm:right-0 sm:max-h-none sm:w-[520px] sm:border-l sm:border-t-0"
       >
-        <div className="flex items-center justify-between border-b border-line px-6 py-4">
+        <div className="flex items-center justify-between gap-3 border-b border-line px-6 py-4">
           <p className="label">{TYPE_NAME[receipt.type]}</p>
-          <button
-            onClick={onClose}
-            className="border border-line px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-faded transition-colors hover:border-accent hover:text-accent"
-          >
-            Close · esc
-          </button>
+          <div className="flex items-center gap-3">
+            {stack.length > 1 && (
+              <button
+                onClick={back}
+                className="border border-line px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-faded transition-colors hover:border-accent hover:text-accent"
+              >
+                ← Back{previousTitle ? ` to ${previousTitle}` : ""}
+              </button>
+            )}
+            <button
+              onClick={onClose}
+              className="border border-line px-3 py-1.5 text-[11px] uppercase tracking-[0.16em] text-faded transition-colors hover:border-accent hover:text-accent"
+            >
+              Close · esc
+            </button>
+          </div>
         </div>
 
         <div className="px-6 py-7">
           <p className="text-[11px] uppercase tracking-[0.18em] text-mute">
             {fmtDayLong(receipt.ts)} · {fmtTime(receipt.ts)}
           </p>
-          <h3 className={`mt-3 font-display text-4xl leading-tight sm:text-5xl ${TYPE_COLOR[receipt.type]}`}>
+          <h3 className={`mt-3 font-display text-4xl leading-tight sm:text-5xl ${receipt.source === "spotify" ? "text-music" : "text-paper"}`}>
             {receipt.title}
           </h3>
           {receipt.subtitle && receipt.source === "spotify" && (
@@ -218,7 +186,7 @@ export default function ReceiptDetail({
 
           {session && (
             <button
-              onClick={() => onOpenReceipt(session.receiptIds[0])}
+              onClick={() => navigate(session.receiptIds.find((id) => id !== receipt.id) ?? session.receiptIds[0])}
               className="mt-6 block w-full border border-line bg-ink/60 p-4 text-left transition-colors hover:border-accent"
             >
               <p className="label">Part of session #{session.id + 1}</p>
@@ -232,41 +200,16 @@ export default function ReceiptDetail({
         </div>
 
         <div className="border-t border-line px-6 py-7">
-          <div className="flex items-baseline justify-between">
-            <p className="label text-accent">
-              {links.length > 0 ? "What connects to it" : "No strong connections"}
-            </p>
-            {links.length > 0 && (
-              <p className="text-[10px] uppercase tracking-[0.14em] text-mute">
-                {links.length} of {fmtCount(archive.receipts.length - 1)} others
-              </p>
-            )}
-          </div>
+          <ThreadExplorer
+            archive={archive}
+            receipt={receipt}
+            onNavigate={navigate}
+          />
 
-          {links.length === 0 ? (
-            <p className="mt-4 text-sm leading-relaxed text-faded">
-              Nothing in the archive is close enough in time, place or pattern to
-              link. Some receipts stay alone.
+          {stack.length > 1 && (
+            <p className="mt-4 text-[10px] uppercase tracking-[0.14em] text-mute">
+              Thread depth {stack.length - 1} · you can keep following, or go back
             </p>
-          ) : (
-            <ol className="mt-2">
-              {links.map((link) => (
-                <ThreadNode key={link.receipt.id + link.reason} link={link} onOpen={onOpenReceipt} />
-              ))}
-            </ol>
-          )}
-
-          {links.length >= 3 && (
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.5, duration: 0.8 }}
-              className="mt-6 border-l-2 border-accent pl-4 font-display text-xl italic leading-snug text-paper"
-            >
-              What looked like {links.length} separate receipts
-              <br />
-              was one stretch of a life.
-            </motion.p>
           )}
         </div>
 
@@ -278,7 +221,7 @@ export default function ReceiptDetail({
             Open {fmtDate(receipt.ts)} in the archive →
           </button>
           <p className="mt-4 text-[11px] leading-relaxed text-mute">
-            The nearest thread link sits {links[0] ? fmtGap(receipt.ts, links[0].receipt.ts).toLowerCase() : "further than the evidence allows"}.
+            The nearest thread link sits {threadLinks[0] ? fmtGap(receipt.ts, threadLinks[0].receipt.ts).toLowerCase() : "further than the evidence allows"}.
           </p>
         </div>
       </motion.div>

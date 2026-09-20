@@ -60,9 +60,21 @@ export type ConnectionType =
   | "location"
   | "category";
 
+/**
+ * How directly two receipts are related. Strength is the UI vocabulary:
+ * a "session" link must never render with the same weight as a
+ * "contextual" one. Label text lives in components/receiptMeta.
+ */
+export type ConnectionStrength = "session" | "temporal" | "recurring" | "contextual";
+
 export interface ThreadLink {
   receipt: LifeReceipt;
   type: ConnectionType;
+  strength: ConnectionStrength;
+  /**
+   * 0–1000, higher = stronger. Type weight × temporal proximity, ranked
+   * deterministically: score desc, then time gap asc, then receipt id.
+   */
   score: number;
   /** Human, observational explanation — always shown next to the link. */
   reason: string;
@@ -71,6 +83,23 @@ export interface ThreadLink {
 export interface EvidenceRow {
   label: string;
   value: string;
+}
+
+/**
+ * A discovery: one evidence-backed observation the reader might have
+ * missed. Generated only when the data clears a threshold — never authored.
+ */
+export interface Discovery {
+  id: string;
+  numeral: string;
+  title: string;
+  /** One-sentence factual summary — what the archive shows. */
+  lead: string;
+  evidence: EvidenceRow[];
+  /** Representative receipts the reader can pull the thread from. */
+  receiptIds: string[];
+  /** Optional archive deep-link. */
+  archiveFocus?: { dayKey?: string; types?: ReceiptType[]; query?: string };
 }
 
 export interface Chapter {

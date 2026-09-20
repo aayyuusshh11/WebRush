@@ -2,6 +2,7 @@ import { motion, useScroll, useSpring } from "framer-motion";
 
 const LINKS: Array<[string, string]> = [
   ["The Record", "record"],
+  ["Discoveries", "discoveries"],
   ["Patterns", "patterns"],
   ["Chapters", "chapters"],
   ["Archive", "archive"],

@@ -2,10 +2,12 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { loadArchive, type Archive } from "./data/dataset";
 import { buildPatterns } from "./engine/patterns";
 import { buildChapters } from "./engine/chapters";
+import { buildDiscoveries } from "./engine/discoveries";
 import type { Chapter, ReceiptType } from "./engine/types";
 import Nav from "./components/Nav";
 import Hero from "./components/Hero";
 import Record from "./components/Record";
+import Discoveries from "./components/Discoveries";
 import Patterns from "./components/Patterns";
 import Chapters from "./components/Chapters";
 import ArchiveView from "./components/Archive";
@@ -37,6 +39,10 @@ export default function App() {
     () => (archive && patterns ? buildChapters(archive, patterns) : []),
     [archive, patterns],
   );
+  const discoveries = useMemo(
+    () => (archive && patterns ? buildDiscoveries(archive, patterns) : []),
+    [archive, patterns],
+  );
 
   const openReceipt = useCallback((id: string) => setReceiptId(id), []);
   const closeReceipt = useCallback(() => setReceiptId(null), []);
@@ -60,7 +66,7 @@ export default function App() {
   // aria-current so screen-reader users get the same orientation as visual ones.
   useEffect(() => {
     if (!archive) return;
-    const ids = ["record", "patterns", "chapters", "archive", "method"];
+    const ids = ["record", "discoveries", "patterns", "chapters", "archive", "method"];
     const navLinks = () =>
       document.querySelectorAll<HTMLAnchorElement>('nav[aria-label="Primary"] a[href^="#"]');
     const setActive = (id: string) => {
@@ -111,6 +117,11 @@ export default function App() {
       <main>
         <Hero meta={archive.meta} onBegin={beginTrace} />
         <Record archive={archive} onEraJump={(era) => jumpToArchive(era === "ledger" ? { types: ["expense"] } : {})} />
+        <Discoveries
+          discoveries={discoveries}
+          onOpenReceipt={openReceipt}
+          onOpenArchive={openArchiveFocus}
+        />
         <Patterns patterns={patterns} meta={archive.meta} />
         <Chapters
           chapters={chapters}
@@ -131,7 +142,6 @@ export default function App() {
           archive={archive}
           receiptId={receiptId}
           onClose={closeReceipt}
-          onOpenReceipt={openReceipt}
           onOpenDay={(dayKey) => {
             closeReceipt();
             jumpToArchive({ dayKey });

@@ -6,6 +6,7 @@
 
 import type { ArchiveMeta, LifeReceipt, ReceiptType, SourceId } from "../types";
 import { assembleArchive, timeKeysOf } from "../../data/dataset";
+import type { Archive } from "../../data/dataset";
 
 /** A UTC timestamp for a given day/hour — keeps tests readable. */
 export function at(year: number, month: number, day: number, hour = 0, minute = 0): number {
@@ -81,6 +82,50 @@ export function makeMeta(overrides: Partial<ArchiveMeta> = {}): ArchiveMeta {
     nightShareByYear: {},
     ...overrides,
   };
+}
+
+/**
+ * An archive engineered to clear every discovery gate: a late-night
+ * overlap day, a track on 6 distinct days, a 21× ledger item, a merchant
+ * with 5 visits, and a 50-minute after-midnight session.
+ */
+export function discoveryArchive(): Archive {
+  const receipts: LifeReceipt[] = [];
+
+  const overlapDay = at(2023, 6, 12, 1);
+  receipts.push(
+    music({ id: "m-o1", ts: overlapDay, title: "Night Song", subtitle: "Artist A" }),
+    music({ id: "m-o2", ts: overlapDay + 600, title: "Night Song 2", subtitle: "Artist A" }),
+    music({ id: "m-o3", ts: overlapDay + 1200, title: "Night Song 3", subtitle: "Artist B" }),
+    music({ id: "m-o4", ts: overlapDay + 1800, title: "Night Song", subtitle: "Artist A" }),
+    purchase({ id: "c-o1", ts: overlapDay + 2400, title: "Swiggy", category: "food_dining", city: "Mumbai", amount: 300 }),
+    purchase({ id: "c-o2", ts: overlapDay + 3000, title: "Swiggy", category: "food_dining", city: "Mumbai", amount: 250 }),
+  );
+
+  for (let d = 0; d < 6; d++) {
+    receipts.push(music({ id: `m-t${d}`, ts: at(2023, 5, 1 + d * 2, 9), title: "Echo Track", subtitle: "Artist A" }));
+  }
+
+  for (let i = 0; i < 21; i++) {
+    receipts.push(
+      ledger({ id: `l-m${i}`, ts: at(2016, 1, 1 + (i % 28), 8), title: "Milk", subcategory: "milk", amount: 30 }),
+    );
+  }
+
+  for (let d = 0; d < 3; d++) {
+    receipts.push(
+      purchase({ id: `c-s${d}`, ts: at(2023, 7, 1 + d * 3, 13), title: "Swiggy", category: "food_dining", city: "Mumbai", amount: 200 }),
+    );
+  }
+
+  const night = at(2022, 3, 4, 1);
+  receipts.push(
+    music({ id: "m-n1", ts: night, title: "Deep Track", subtitle: "Artist C" }),
+    music({ id: "m-n2", ts: night + 25 * 60, title: "Deep Track 2", subtitle: "Artist C" }),
+    music({ id: "m-n3", ts: night + 50 * 60, title: "Deep Track 3", subtitle: "Artist C" }),
+  );
+
+  return assembleArchive(receipts, makeMeta());
 }
 
 export { assembleArchive };

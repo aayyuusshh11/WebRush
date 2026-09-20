@@ -1,186 +1,10 @@
 import { useMemo, useRef, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
 import SectionHeader from "./SectionHeader";
+import ReceiptRow from "./ReceiptRow";
+import ThreadPanel from "./ThreadPanel";
 import type { Archive } from "../data/dataset";
 import type { LifeReceipt, ReceiptType } from "../engine/types";
-import type { ThreadLink } from "../engine/types";
-import { getThread } from "../engine/connections";
-import { fmtAmount, fmtCount, fmtDate, fmtDateShort, fmtDayLong, fmtDuration, fmtTime } from "../engine/format";
-
-/* ------------------------------------------------------------------ */
-/* receipt row                                                         */
-/* ------------------------------------------------------------------ */
-
-const TYPE_COLOR: Record<ReceiptType, string> = {
-  music: "text-music",
-  purchase: "text-purchase",
-  expense: "text-expense",
-  income: "text-income",
-  transfer: "text-transfer",
-};
-
-function ReceiptRow({
-  r,
-  onOpen,
-  selected,
-}: {
-  r: LifeReceipt;
-  onOpen: (r: LifeReceipt) => void;
-  selected: boolean;
-}) {
-  const secondary =
-    r.source === "spotify"
-      ? r.subtitle
-      : r.source === "card"
-        ? [r.city, r.state].filter(Boolean).join(", ")
-        : r.subtitle;
-
-  return (
-    <li>
-      <button
-        onClick={() => onOpen(r)}
-        aria-pressed={selected}
-        className={`group grid w-full grid-cols-[74px_1fr_auto] items-baseline gap-3 border-b border-line/60 px-2 py-3 text-left transition-colors hover:bg-surface ${
-          selected ? "bg-surface" : ""
-        }`}
-      >
-        <span className="text-[10px] uppercase tracking-[0.14em] text-mute tabular-nums">
-          {fmtTime(r.ts)}
-        </span>
-        <span className="min-w-0">
-          <span className={`block truncate text-sm ${TYPE_COLOR[r.type]}`}>
-            {r.title}
-          </span>
-          {secondary && (
-            <span className="block truncate text-xs text-mute">
-              {secondary}
-              {r.category ? ` · ${r.category}` : ""}
-            </span>
-          )}
-        </span>
-        <span className="text-right text-[11px] tabular-nums text-mute">
-          {r.source === "spotify"
-            ? r.skipped
-              ? "skipped"
-              : fmtDuration(r.msPlayed ?? 0)
-            : r.amount !== undefined
-              ? `${r.type === "income" ? "+" : "−"}${fmtAmount(r.amount)}`
-              : ""}
-        </span>
-      </button>
-    </li>
-  );
-}
-
-/* ------------------------------------------------------------------ */
-/* thread panel                                                        */
-/* ------------------------------------------------------------------ */
-
-const THREAD_STYLE: Record<ThreadLink["type"], { label: string; className: string }> = {
-  temporal: { label: "same day", className: "text-paper" },
-  session: { label: "session", className: "text-music" },
-  recurrence: { label: "repeats", className: "text-accent" },
-  location: { label: "same place", className: "text-purchase" },
-  category: { label: "same kind", className: "text-income" },
-};
-
-function ThreadPanel({
-  receipt,
-  archive,
-  onClose,
-  onOpenReceipt,
-}: {
-  receipt: LifeReceipt;
-  archive: Archive;
-  onClose: () => void;
-  onOpenReceipt: (id: string) => void;
-}) {
-  const links = useMemo(() => getThread(archive, receipt), [archive, receipt]);
-  const session = receipt.sessionId !== undefined ? archive.sessionById.get(receipt.sessionId) : undefined;
-
-  return (
-    <AnimatePresence>
-      <motion.aside
-        key="thread"
-        initial={{ opacity: 0, x: 24 }}
-        animate={{ opacity: 1, x: 0 }}
-        exit={{ opacity: 0, x: 24 }}
-        transition={{ duration: 0.35, ease: [0.16, 1, 0.3, 1] }}
-        aria-label="Connected receipts"
-        className="border border-accent/40 bg-surface-soft p-5"
-      >
-        <div className="flex items-start justify-between gap-3">
-          <p className="label text-accent">The thread</p>
-          <button
-            onClick={onClose}
-            className="text-[11px] uppercase tracking-[0.16em] text-mute transition-colors hover:text-paper"
-          >
-            Close
-          </button>
-        </div>
-
-        <div className="mt-4 border-l-2 border-accent/60 pl-4">
-          <p className={`text-sm ${TYPE_COLOR[receipt.type]}`}>{receipt.title}</p>
-          <p className="mt-0.5 text-[11px] uppercase tracking-[0.14em] text-mute">
-            {fmtTime(receipt.ts)} · {fmtDate(receipt.ts)}
-          </p>
-        </div>
-
-        {session && receipt.source === "spotify" && (
-          <p className="mt-4 text-xs leading-relaxed text-faded">
-            Belongs to a listening session — {session.tracks} tracks,{" "}
-            {session.artists.length} artists
-            {session.dominantArtist ? `, circling ${session.dominantArtist}` : ""}.
-            {session.lateNight && " It began after midnight."}
-          </p>
-        )}
-
-        <p className="mt-5 label">
-          {links.length > 0 ? `${links.length} connections` : "No strong connections"}
-        </p>
-
-        {links.length === 0 ? (
-          <p className="mt-3 text-xs leading-relaxed text-mute">
-            Nothing in the archive ties to this receipt strongly enough to draw.
-            Some moments stand alone — that is a finding too.
-          </p>
-        ) : (
-          <ol className="mt-3 space-y-0">
-            {links.map((link, i) => (
-              <li key={`${link.receipt.id}-${i}`}>
-                <button
-                  onClick={() => onOpenReceipt(link.receipt.id)}
-                  className="group w-full border-b border-line/60 py-3 text-left transition-colors hover:bg-ink"
-                >
-                  <div className="flex items-baseline justify-between gap-3">
-                    <span className={`truncate text-sm ${TYPE_COLOR[link.receipt.type]}`}>
-                      {link.receipt.title}
-                    </span>
-                    <span className="shrink-0 text-[10px] uppercase tracking-[0.14em] text-mute">
-                      {fmtTime(link.receipt.ts)}
-                    </span>
-                  </div>
-                  <p className="mt-1 text-[11px] uppercase tracking-[0.14em] text-mute">
-                    <span className={THREAD_STYLE[link.type].className}>
-                      {THREAD_STYLE[link.type].label}
-                    </span>
-                    {" · "}
-                    {link.reason}
-                  </p>
-                </button>
-              </li>
-            ))}
-          </ol>
-        )}
-
-        <p className="mt-5 border-t border-line pt-4 text-[11px] leading-relaxed text-mute">
-          Connections are computed, deterministic and explained. The archive shows
-          what happened together — not why.
-        </p>
-      </motion.aside>
-    </AnimatePresence>
-  );
-}
+import { fmtCount, fmtDateShort, fmtDayLong } from "../engine/format";
 
 /* ------------------------------------------------------------------ */
 /* archive                                                             */
@@ -219,22 +43,36 @@ export default function ArchiveView({ archive, focus, onOpenReceipt }: Props) {
 
   const days = useMemo(() => [...archive.byDay.keys()].sort().reverse(), [archive]);
 
-  const filtered = useMemo(() => {
+  // Search index: normalize each receipt's searchable text exactly once per
+  // archive load instead of rebuilding haystack strings on every keystroke.
+  const searchIndex = useMemo(() => {
+    const index = new Map<string, string>();
+    for (const r of archive.receipts) {
+      index.set(
+        r.id,
+        `${r.title} ${r.subtitle ?? ""} ${r.category ?? ""} ${r.subcategory ?? ""} ${r.city ?? ""} ${r.album ?? ""}`.toLowerCase(),
+      );
+    }
+    return index;
+  }, [archive]);
+
+  // Filter and count in one traversal over the archive.
+  const { filtered, counts } = useMemo(() => {
     const q = query.trim().toLowerCase();
     const eraStart = era === "ledger" ? 0 : Date.UTC(2022, 0, 1) / 1000;
     const eraEnd = era === "ledger" ? Date.UTC(2019, 0, 1) / 1000 : Infinity;
-
-    return archive.receipts.filter((r) => {
-      if (era === "ledger" && (r.ts < eraStart || r.ts >= eraEnd)) return false;
-      if (type !== "all" && r.type !== type) return false;
-      if (dayKey && r.dayKey !== dayKey) return false;
-      if (q) {
-        const haystack = `${r.title} ${r.subtitle ?? ""} ${r.category ?? ""} ${r.subcategory ?? ""} ${r.city ?? ""} ${r.album ?? ""}`.toLowerCase();
-        if (!haystack.includes(q)) return false;
-      }
-      return true;
-    });
-  }, [archive, era, type, query, dayKey]);
+    const c = { music: 0, purchase: 0, expense: 0, income: 0, transfer: 0 };
+    const out: LifeReceipt[] = [];
+    for (const r of archive.receipts) {
+      if (era === "ledger" && (r.ts < eraStart || r.ts >= eraEnd)) continue;
+      if (type !== "all" && r.type !== type) continue;
+      if (dayKey && r.dayKey !== dayKey) continue;
+      if (q && !(searchIndex.get(r.id) ?? "").includes(q)) continue;
+      out.push(r);
+      c[r.type]++;
+    }
+    return { filtered: out, counts: c };
+  }, [archive, era, type, query, dayKey, searchIndex]);
 
   const visible = filtered.slice(0, limit);
 
@@ -244,18 +82,12 @@ export default function ArchiveView({ archive, focus, onOpenReceipt }: Props) {
     topRef.current?.scrollIntoView({ behavior: "smooth", block: "start" });
   };
 
-  const counts = useMemo(() => {
-    const c = { music: 0, purchase: 0, expense: 0, income: 0, transfer: 0 };
-    for (const r of filtered) c[r.type]++;
-    return c;
-  }, [filtered]);
-
   return (
     <section id="archive" aria-labelledby="archive-title" className="scroll-mt-16 border-t border-line bg-surface/40 py-24 sm:py-32">
       <SectionHeader
         eyebrow="Archive"
         title={<span id="archive-title">Read every receipt.</span>}
-        lede="Search by artist, merchant, item, city or category. Filter by kind, jump to a day, and pull any thread you find."
+        lede="Search by artist, merchant, item, city or category. Filter by kind and coverage window, jump to a day, and pull any thread you find."
       />
 
       <div ref={topRef} className="mx-auto mt-12 w-full max-w-6xl px-5 sm:px-8">
@@ -299,7 +131,7 @@ export default function ArchiveView({ archive, focus, onOpenReceipt }: Props) {
                     : "border-line text-mute hover:border-faded hover:text-faded"
                 }`}
               >
-                {e === "all" ? "All years" : e === "ledger" ? "Ledger era" : "Detail era"}
+                {e === "all" ? "All years" : e === "ledger" ? "Ledger · 2015–2018" : "Detail · 2022–2024"}
               </button>
             ))}
             <span aria-hidden className="mx-1 hidden h-4 w-px bg-line sm:block" />
